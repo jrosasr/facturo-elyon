@@ -44,4 +44,21 @@ class Invoice extends Model
             get: fn () => $this->products->sum(fn ($product) => $product->pivot->quantity * $product->pivot->price),
         );
     }
+
+    public function restoreStock(): void
+    {
+        foreach ($this->products as $product) {
+            $product->stock += $product->pivot->quantity;
+            $product->save();
+        }
+    }
+
+    protected static function booted(): void
+    {
+        static::deleted(function (Invoice $invoice) {
+            if ($invoice->status !== 'canceled') {
+                $invoice->restoreStock();
+            }
+        });
+    }
 }

@@ -9,3 +9,13 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+
+/* En tu archivo CSS personalizado */
+.filament-forms-repeater-item {
+    @apply bg-gray-50 p-4 rounded-lg border border-gray-200;
+}
+
+.filament-placeholder {
+    @apply text-primary-600 font-semibold;
+}

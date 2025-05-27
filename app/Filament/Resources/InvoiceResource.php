@@ -14,6 +14,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\DB;
 
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -22,6 +23,11 @@ use Filament\Forms\Components\Placeholder;
 use Filament\Support\Colors\Colors;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\Alignment;
+
+use Barryvdh\DomPDF\Facade\Pdf;
+use Filament\Actions\Action; // Asegúrate de que esta importación está aquí
+use Filament\Tables\Actions\Action as TableAction; // Importa TableAction
+use Illuminate\Support\Facades\View; // Importa la clase View
 
 use Illuminate\Support\Facades\Log;
 
@@ -37,130 +43,107 @@ class InvoiceResource extends Resource
     // protected static ?string $navigationGroup = 'Configuración';
     // protected static ?int $navigationSort = 2;
 
-
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
-                Forms\Components\Grid::make(3)
-                            ->schema([
-                                Forms\Components\Select::make('client_id')
-                                ->label('Cliente')
-                                ->required()
-                                ->placeholder('Selecciona un cliente')
-                                ->preload()
-                                ->searchable()
-                                ->relationship('client', 'name')
-                                ->options(Client::all()->pluck('name', 'id'))
-                                ->createOptionForm([
-                                    Forms\Components\TextInput::make('name')
-                                        ->required()
-                                        ->label('Nombre'),
-                                    Forms\Components\TextInput::make('phone')
-                                        ->tel()
-                                        ->label('Teléfono'),
-                                    Forms\Components\TextInput::make('address')
-                                        ->label('Dirección'),
-                                    Forms\Components\TextInput::make('notes')
-                                        ->label('Notas'),
-                                    Forms\Components\Hidden::make('user_id')
-                                        ->default(auth()->id()),
-                                ]),
-                                Forms\Components\DatePicker::make('date')
-                                    ->required()
-                                    ->maxDate(now())
-                                    ->default(now())
-                                    ->placeholder('Selecciona una fecha')
-                                    ->reactive()
-                                    ->label('Fecha'),
-                                Forms\Components\Select::make('status')
-                                    ->label('Estatus')
-                                    ->placeholder('Selecciona un estatus')
-                                    ->options([
-                                        'paid' => 'Pagado',
-                                        'unpaid' => 'Pendiente',
-                                        'canceled' => 'Cancelado',
-                                    ])
-                                    ->required(),
-                            ]),
-                        Forms\Components\Textarea::make('details')
-                            ->columnSpanFull()
-                            ->label('Detalles'),
-                        Forms\Components\Hidden::make('user_id')
-                            ->default(auth()->id()),
-
-                Repeater::make('invoice_products')
-                    ->label('Lista de productos')
-                    ->schema([
-                        Forms\Components\Grid::make(4) // 4 columnas
-                            ->columnSpanFull()
-                            ->columns(4)
-                            ->schema([
-                                Select::make('product_id')
-                                    ->label('Producto')
-                                    ->relationship('products', 'name')
-                                    ->options(function (Forms\Get $get, Forms\Set $set) {
-                                        $selectedProducts = collect($get('invoice_products'))
-                                            ->pluck('product_id')
-                                            ->filter()
-                                            ->toArray();
-                                        Log::info($selectedProducts);
-
-                                        return \App\Models\Product::whereNotIn('id', $selectedProducts)->pluck('name', 'id');
-                                    })
-                                    ->required()
-                                    ->reactive()
-                                    ->afterStateUpdated(function ($state, Forms\Set $set) {
-                                        $product = \App\Models\Product::find($state);
-                                        if ($product) {
-                                            $set('price', $product->price);
-                                            $set('quantity', 1);
-                                        } else {
-                                            $set('price', 0);
-                                        }
-                                    }),
-
-                                TextInput::make('quantity')
-                                    ->label('Cantidad')
-                                    ->numeric()
-                                    ->default(1)
-                                    ->required()
-                                    ->minValue(1)
-                                    ->reactive()
-                                    ->name('quantity')
-                                    ->afterStateUpdated(function ($get, Forms\Set $set) {
-                                        $set('total_price', $get('quantity') * $get('price'));
-                                    }),
-                                TextInput::make('price')
-                                    ->label('Precio')
-                                    ->numeric()
-                                    ->reactive()
-                                    ->name('price')
-                                    ->required()
-                                    ->afterStateUpdated(function ($get, Forms\Set $set) {
-                                        $set('total_price', $get('quantity') * $get('price'));
-                                    }),
-                                TextInput::make('total_price')
-                                    ->label('Cantidad * Precio')
-                                    ->numeric()
-                                    ->disabled(),
-                            ]),
+                Forms\Components\Select::make('client_id')
+                    ->label('Cliente')
+                    ->required()
+                    ->searchable()
+                    ->preload()
+                    ->relationship('client', 'name')
+                    ->createOptionForm([
+                        Forms\Components\TextInput::make('name')
+                            ->required(),
+                        Forms\Components\TextInput::make('phone'),
+                        Forms\Components\Textarea::make('address'),
+                    ]),
+                
+                Forms\Components\Select::make('status')
+                    ->options([
+                        'unpaid' => 'Pendiente',
+                        'paid' => 'Pagada',
+                        'canceled' => 'Cancelada',
                     ])
-                    ->addActionLabel('Agregar')
-                    ->columnSpanFull(),
+                    ->default('unpaid')
+                    ->required()
+                    ->label('Estado')
+                    ->visible(fn (string $operation): bool => $operation === 'edit'),
+                
+                Forms\Components\DatePicker::make('date')
+                    ->label('Fecha')
+                    ->required()
+                    ->default(now()),
+                
+                Forms\Components\Repeater::make('invoice_products')
+                    ->label('Productos')
+                    ->schema([
+                        Forms\Components\Select::make('product_id')
+                            ->label('Producto')
+                            ->required()
+                            ->searchable()
+                            ->reactive()
+                            ->options(Product::where('user_id', auth()->id())->pluck('name', 'id'))
+                            ->afterStateUpdated(function ($state, Forms\Set $set) {
+                                $product = Product::find($state);
+                                if ($product) {
+                                    $set('price', $product->price);
+                                    $set('available_stock', $product->stock);
+                                }
+                            }),
+                        
+                        Forms\Components\TextInput::make('quantity')
+                            ->label('Cantidad')
+                            ->required()
+                            ->numeric()
+                            ->minValue(1)
+                            ->default(1)
+                            ->reactive()
+                            ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, $state) {
+                                $price = $get('price') ?? 0;
+                                $set('subtotal', $state * $price);
+                            }),
+                        
+                        Forms\Components\TextInput::make('price')
+                            ->label('Precio Unitario')
+                            ->numeric()
+                            ->required()
+                            ->reactive() // Agregar esto
+                            ->prefix('$')
+                            ->default(0)
+                            ->afterStateHydrated(function ($state, Forms\Set $set) {
+                                // Convertir de centavos a dólares al cargar
+                                $set('price', $state);
+                            })
+                            ->dehydrateStateUsing(fn ($state) => $state * 100), // Convertir a centavos al guardar
 
-                Placeholder::make('total_amount')
-                    ->label('Total')
-                    ->content(function ($get) {
-                        $total = collect($get('invoice_products'))
-                            ->sum(function ($item) {
-                                return $item['quantity'] * $item['price'];
-                            });
-                        return "Total: " . number_format($total, 2); // Formatea el total
+
+                        
+                        Forms\Components\Placeholder::make('subtotal')
+                            ->label('Subtotal')
+                            ->content(function (Forms\Get $get) {
+                                return '$' . number_format($get('quantity') * $get('price'), 2);
+                            }),
+                    ])
+                    ->columns(4)
+                    ->columnSpanFull()
+                    ->live(),
+                
+                Forms\Components\Placeholder::make('total')
+                    ->label('Total Factura')
+                    ->content(function (Forms\Get $get) {
+                        $total = collect($get('invoice_products'))->sum(fn ($item) => ($item['quantity'] ?? 0) * ($item['price'] ?? 0));
+                        return '$' . number_format($total, 2);
                     })
-                    ->extraAttributes(['class' => 'text-right text-xl font-bold'])
+                    ->extraAttributes(['class' => 'text-xl font-bold'])
                     ->columnSpanFull(),
-            ]);
+                
+                Forms\Components\Textarea::make('details')
+                    ->label('Notas')
+                    ->columnSpanFull(),
+            ])
+            ->columns(2);
     }
 
     public static function table(Table $table): Table
@@ -189,10 +172,41 @@ class InvoiceResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
+                TableAction::make('generate_pdf')  // Usa TableAction aquí
+                ->label('Generar PDF')
+                ->action(function (Invoice $record) {
+                    // Obtener los datos necesarios para la factura
+                    $invoiceData = $record->toArray();
+                    $productsData = $record->products->toArray();
+                    $clientData = $record->client->toArray();
+                    $userData = $record->user->toArray();
+
+                    // Pasar los datos a la vista (asegúrate de crear esta vista)
+                    $pdf = Pdf::loadView('pdf.invoice', [
+                        'invoice' => $invoiceData,
+                        'products' => $productsData,
+                        'client' => $clientData,
+                        'user' => $userData,
+                    ]);
+
+                    // Descargar el PDF
+                    return response()->streamDownload(function () use ($pdf) {
+                        echo $pdf->stream();
+                    }, "factura-{$record->id}.pdf");
+                }),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->before(function (Tables\Actions\DeleteBulkAction $action, Collection $records) {
+                            DB::transaction(function () use ($records) {
+                                foreach ($records as $record) {
+                                    if ($record->status !== 'canceled') {
+                                        $record->restoreStock();
+                                    }
+                                }
+                            });
+                        }),
                 ]),
             ]);
     }

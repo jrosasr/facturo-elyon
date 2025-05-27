@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Casts\Money;
 
 class Product extends Model
 {
@@ -18,6 +19,12 @@ class Product extends Model
         'image',
         'category_id',
         'user_id',
+    ];
+
+    protected $casts = [
+        'price' => Money::class,
+        'stock' => 'integer',
+        'stock_min' => 'integer',
     ];
 
     public function categories(): BelongsToMany // Cambia el nombre y el tipo de relación

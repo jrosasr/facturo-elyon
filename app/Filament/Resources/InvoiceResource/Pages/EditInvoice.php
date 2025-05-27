@@ -6,6 +6,10 @@ use App\Filament\Resources\InvoiceResource;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model; // Import Model
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Filament\Notifications\Notification;
+use App\Models\Product;
 
 class EditInvoice extends EditRecord
 {
@@ -14,7 +18,33 @@ class EditInvoice extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
+            Actions\Action::make('cancel')
+                ->label('Cancelar Factura')
+                ->color('danger')
+                ->icon('heroicon-o-x-circle')
+                ->requiresConfirmation()
+                ->action(function () {
+                    DB::transaction(function () {
+                        $this->getRecord()->update(['status' => 'canceled']);
+                        $this->getRecord()->restoreStock();
+                        Notification::make()
+                            ->success()
+                            ->title('Factura cancelada')
+                            ->body('El stock de productos ha sido restaurado.')
+                            ->send();
+                    });
+                    $this->redirect($this->getResource()::getUrl('index'));
+                })
+                ->visible(fn (): bool => $this->getRecord()->status !== 'canceled'),
+            
+            Actions\DeleteAction::make()
+                ->before(function (Actions\DeleteAction $action) {
+                    DB::transaction(function () {
+                        if ($this->getRecord()->status !== 'canceled') {
+                            $this->getRecord()->restoreStock();
+                        }
+                    });
+                }),
         ];
     }
 
@@ -27,28 +57,23 @@ class EditInvoice extends EditRecord
      */
     protected function mutateFormDataBeforeFill(array $data): array
     {
-        // Ensure 'invoice_products' key exists and is an array
         $data['invoice_products'] = [];
+        $invoice = $this->getRecord()->load('products');
 
-        // Load the invoice with its products and pivot data
-        // Use $this->getRecord() to get the current Invoice model instance
-        $invoice = $this->getRecord()->load('products'); // Eager load the 'products' relation
-
-        // Check if the invoice and its products relation exist
         if ($invoice && $invoice->products) {
-            // Iterate over each product in the relation to format it for the Repeater
             foreach ($invoice->products as $product) {
                 $data['invoice_products'][] = [
                     'product_id' => $product->id,
                     'quantity' => $product->pivot->quantity,
-                    'price' => $product->pivot->price / 100, // Divide by 100 for display in form
-                    'total_price' => ($product->pivot->quantity * $product->pivot->price) / 100, // Calculate total for display
+                    'price' => $product->pivot->price / 100,
+                    'total_price' => ($product->pivot->quantity * $product->pivot->price) / 100,
                 ];
             }
         }
 
         return $data;
     }
+
 
     /**
      * Handle the record update process.
@@ -60,34 +85,52 @@ class EditInvoice extends EditRecord
      */
     protected function handleRecordUpdate(Model $record, array $data): Model
     {
-        // Update the main invoice record fields
-        $record->update([
-            'client_id' => $data['client_id'],
-            'date' => $data['date'],
-            'status' => $data['status'],
-            'details' => $data['details'],
-        ]);
-        
-        // Prepare data for syncing products with pivot attributes
-        $productsData = [];
-        // Check if 'invoice_products' exists and is an array to prevent errors
-        if (isset($data['invoice_products']) && is_array($data['invoice_products'])) {
+        DB::beginTransaction();
+        try {
+            // Validación de stock
+            $insufficientStockProducts = [];
             foreach ($data['invoice_products'] as $product) {
-                // Ensure product_id is set before using it as an array key
-                if (isset($product['product_id'])) {
-                    $productsData[$product['product_id']] =
-                    [
-                        'quantity' => $product['quantity'],
-                        'price' => $product['price'] * 100, // Multiply by 100 for storage in cents
-                    ];
+                $productModel = Product::find($product['product_id']);
+                $originalQuantity = $record->products->find($product['product_id'])?->pivot->quantity ?? 0;
+                $quantityDifference = $product['quantity'] - $originalQuantity;
+
+                if ($productModel->stock - $quantityDifference < 0) {
+                    $insufficientStockProducts[] = $productModel->name;
                 }
             }
+
+            if (!empty($insufficientStockProducts)) {
+                // ... (mantener tu lógica de error)
+            }
+
+            $record->update([
+                'client_id' => $data['client_id'],
+                'date' => $data['date'],
+                'status' => $data['status'],
+                'details' => $data['details'],
+            ]);
+
+            $productsData = [];
+            foreach ($data['invoice_products'] as $product) {
+                $productsData[$product['product_id']] = [
+                    'quantity' => $product['quantity'],
+                    'price' => $product['price'], // Ya viene en centavos
+                ];
+
+                $productModel = Product::find($product['product_id']);
+                $originalQuantity = $record->products->find($product['product_id'])?->pivot->quantity ?? 0;
+                $quantityDifference = $product['quantity'] - $originalQuantity;
+                $productModel->stock -= $quantityDifference;
+                $productModel->save();
+            }
+
+            $record->products()->sync($productsData);
+            DB::commit();
+            return $record;
+        } catch (\Exception $e) {
+            DB::rollback();
+            throw $e;
         }
-
-        // Sync the products relation with the new/updated pivot data
-        $record->products()->sync($productsData);
-
-        return $record;
     }
 
 }
