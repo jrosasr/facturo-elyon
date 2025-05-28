@@ -11,8 +11,12 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Resources\Components\Tab;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Filament\Tables\Actions\Action; // Importa la clase Action
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\View;
 
 class ProductResource extends Resource
 {
@@ -37,6 +41,12 @@ class ProductResource extends Resource
                 Forms\Components\Textarea::make('description')
                     ->maxLength(250)
                     ->label('Descripción'),
+                Forms\Components\TextInput::make('cost')
+                    ->required()
+                    ->numeric()
+                    ->minValue(0)
+                    ->label('Costo')
+                    ->prefix('$'),
                 Forms\Components\TextInput::make('price')
                     ->required()
                     ->numeric()
@@ -98,43 +108,89 @@ class ProductResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table->modifyQueryUsing(function (Builder $query)  {
+        return $table
+            ->modifyQueryUsing(function (Builder $query)  {
                 $query->where('user_id', auth()->user()->id);
             })
             ->columns([
+                Tables\Columns\ImageColumn::make('image')
+                    ->label('Imagen'),
                 Tables\Columns\TextColumn::make('name')
+                    ->label('Nombre')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('description')
+                    ->label('Descripción')
                     ->searchable(),
+                Tables\Columns\TextColumn::make('cost')
+                    ->label('Costo')
+                    ->money()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('price')
+                    ->label('Precio')
                     ->money()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('stock')
+                    ->label('Stock')
                     ->numeric()
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('stock_min')
+                    ->label('Stock Mínimo')
                     ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('status')
-                    ->searchable(),
-                Tables\Columns\ImageColumn::make('image'),
-                Tables\Columns\TextColumn::make('category_id')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('created_at')
-                    ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('updated_at')
-                    ->dateTime()
+                Tables\Columns\BadgeColumn::make('status')  // Usamos BadgeColumn
+                    ->label('Estado')
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'active' => 'Activo',
+                        'inactive' => 'Inactivo',
+                        default => $state,
+                    })
+                    ->colors([
+                        'success' => 'active',
+                        'danger' => 'inactive',
+                    ]),
+                Tables\Columns\TagsColumn::make('categories.name')
+                    ->label('Categorías'),
+                // Tables\Columns\TextColumn::make('created_at')
+                //     ->label('Creado')
+                //     ->dateTime()
+                //     ->sortable()
+                //     ->toggleable(isToggledHiddenByDefault: true),
+                // Tables\Columns\TextColumn::make('updated_at')
+                //     ->label('Actualizado')
+                //     ->dateTime()
+                //     ->sortable()
+                //     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 //
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
+            ])
+            ->headerActions([
+                Tables\Actions\CreateAction::make(),
+                Action::make('generatePdf')
+                    ->label('Generar PDF')
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->action(function () {
+                        $productsByCategory = Category::with(['products' => function ($query) {
+                            $query->where('user_id', auth()->id());
+                        }])
+                            ->whereHas('products', function ($query) {
+                                $query->where('user_id', auth()->id());
+                            })
+                            ->get();
+
+                        $pdf = Pdf::loadView('pdf.products', ['productsByCategory' => $productsByCategory]);
+
+                        return response()->streamDownload(function () use ($pdf) {
+                            echo $pdf->stream('products.pdf');
+                        }, 'products.pdf');
+                    }),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -158,4 +214,19 @@ class ProductResource extends Resource
             'edit' => Pages\EditProduct::route('/{record}/edit'),
         ];
     }
+
+    // public static function getTabs(): array
+    // {
+    //     return [
+    //         'all' => Tab::make('Todos'),
+    //         'cat_1' => Tab::make('Categoría 1')
+    //             ->modifyQueryUsing(fn (Builder $query) => $query->whereHas('categories', function (Builder $query) {
+    //                 $query->where('categories.id', 1); // Filtra por categoría con ID 1
+    //             })),
+    //         'cat_2' => Tab::make('Categoría 2')
+    //             ->modifyQueryUsing(fn (Builder $query) => $query->whereHas('categories', function (Builder $query) {
+    //                 $query->where('categories.id', 2); // Filtra por categoría con ID 2
+    //             })),
+    //     ];
+    // }
 }

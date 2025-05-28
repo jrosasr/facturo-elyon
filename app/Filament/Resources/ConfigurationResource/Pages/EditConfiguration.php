@@ -10,6 +10,11 @@ class EditConfiguration extends EditRecord
 {
     protected static string $resource = ConfigurationResource::class;
 
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
+    }
+
     protected function getHeaderActions(): array
     {
         return [

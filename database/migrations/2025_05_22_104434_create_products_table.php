@@ -15,8 +15,9 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('description')->nullable();
-            $table->integer('price');
-            $table->integer('stock');
+            $table->integer('cost')->default(0);
+            $table->integer('price')->default(0);
+            $table->integer('stock')->default(0);
             $table->integer('stock_min')->default(0);
 
             $table->enum('status', ['active', 'inactive'])->default('active');

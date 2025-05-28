@@ -12,6 +12,7 @@ class Product extends Model
     protected $fillable = [
         'name',
         'description',
+        'cost',
         'price',
         'stock',
         'stock_min',
@@ -22,6 +23,7 @@ class Product extends Model
     ];
 
     protected $casts = [
+        'cost' => Money::class,
         'price' => Money::class,
         'stock' => 'integer',
         'stock_min' => 'integer',

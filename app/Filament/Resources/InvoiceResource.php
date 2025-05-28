@@ -174,6 +174,7 @@ class InvoiceResource extends Resource
                 Tables\Actions\EditAction::make(),
                 TableAction::make('generate_pdf')  // Usa TableAction aquí
                 ->label('Generar PDF')
+                ->icon('heroicon-o-document-arrow-down')
                 ->action(function (Invoice $record) {
                     // Obtener los datos necesarios para la factura
                     $invoiceData = $record->toArray();
