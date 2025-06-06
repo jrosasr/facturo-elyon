@@ -6,11 +6,21 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
-class User extends Authenticatable
+use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
+
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Models\Contracts\HasTenants;
+use Filament\Panel;
+use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Filament\Facades\Filament;
+
+use App\Models\Team;
+
+class User extends Authenticatable implements FilamentUser, HasTenants
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable;
 
     /**
@@ -47,25 +57,41 @@ class User extends Authenticatable
         ];
     }
 
-    // relationships
-    public function invoices(): HasMany
+    /**
+     * Get the user's initials
+     */
+    public function initials(): string
     {
-        return $this->hasMany(Invoice::class);
+        return Str::of($this->name)
+            ->explode(' ')
+            ->map(fn (string $name) => Str::of($name)->substr(0, 1))
+            ->implode('');
     }
-    public function clients(): HasMany
+
+    public function getTenants(Panel $panel): Collection
     {
-        return $this->hasMany(Client::class);
+        return $this->teams;
     }
-    public function products(): HasMany
+
+    public function teams(): BelongsToMany
     {
-        return $this->hasMany(Product::class);
+        return $this->belongsToMany(Team::class);
     }
-    public function categories(): HasMany
+
+
+    public function canAccessTenant(Model $tenant): bool
     {
-        return $this->hasMany(Category::class);
+        return $this->teams()->whereKey($tenant)->exists();
+        // return $this->teams->contains($tenant);
     }
-    public function configuration(): HasOne
+
+    public function canAccessPanel(Panel $panel): bool
     {
-        return $this->hasOne(Configuration::class);
+        return true;
+    }
+
+    public function currentTeam(): ?Team
+    {
+        return Filament::getTenant();
     }
 }

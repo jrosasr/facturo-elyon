@@ -99,8 +99,8 @@ class ProductResource extends Resource
                             ->label('Descripción de la categoría'),
                         Forms\Components\Hidden::make('status')
                             ->default('active'),
-                        Forms\Components\Hidden::make('user_id')
-                            ->default(auth()->id()),
+                        Forms\Components\Hidden::make('team_id')
+                            ->default(auth()->user()->currentTeam()->id)
                     ]),
 
             ]);
@@ -109,9 +109,6 @@ class ProductResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(function (Builder $query)  {
-                $query->where('user_id', auth()->user()->id);
-            })
             ->columns([
                 Tables\Columns\ImageColumn::make('image')
                     ->label('Imagen'),
@@ -178,10 +175,10 @@ class ProductResource extends Resource
                     ->icon('heroicon-o-document-arrow-down')
                     ->action(function () {
                         $productsByCategory = Category::with(['products' => function ($query) {
-                            $query->where('user_id', auth()->id());
+                            $query->where('team_id', auth()->user()->currentTeam()->id);
                         }])
                             ->whereHas('products', function ($query) {
-                                $query->where('user_id', auth()->id());
+                                $query->where('team_id', auth()->user()->currentTeam()->id);
                             })
                             ->get();
 

@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+use App\Models\Team;
+
 class Client extends Model
 {
     protected $fillable = [
@@ -13,12 +15,12 @@ class Client extends Model
         'phone',
         'address',
         'notes',
-        'user_id',
+        'team_id',
     ];
 
-    public function user(): BelongsTo
+    public function team(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Team::class);
     }
 
     public function invoices(): HasMany

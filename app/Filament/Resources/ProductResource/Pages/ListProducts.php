@@ -25,12 +25,12 @@ class ListProducts extends ListRecords
     {
         $tabs = [
             'all' => Tab::make('Todos')
-                ->badge(Product::where('user_id', auth()->user()->id)->count()), // Cuenta todos los productos del usuario
+                ->badge(Product::where('team_id', auth()->user()->currentTeam()->id)->count()), // Cuenta todos los productos del usuario
         ];
 
         Category::all()->each(function (Category $category) use (&$tabs) {
             $tabs[$category->id] = Tab::make($category->name)
-                ->badge(Product::where('user_id', auth()->user()->id)
+                ->badge(Product::where('team_id', auth()->user()->currentTeam()->id)
                     ->whereHas('categories', function (Builder $q) use ($category) {
                         $q->where('categories.id', $category->id);
                     })

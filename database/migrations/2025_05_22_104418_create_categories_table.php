@@ -16,10 +16,10 @@ return new class extends Migration
             $table->string('name');
             $table->string('description')->nullable();
             $table->enum('status', ['active', 'inactive'])->default('active');
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('team_id')->constrained()->onDelete('cascade');
 
-            // llave unica usando en user_id y el nombre del producto
-            $table->unique(['user_id', 'name'], 'user_category_unique');
+            // llave unica usando en team_id y el nombre del producto
+            $table->unique(['team_id', 'name'], 'user_category_unique');
 
             $table->timestamps();
         });

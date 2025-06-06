@@ -2,6 +2,8 @@
 
 namespace App\Providers\Filament;
 
+use App\Models\Team;
+use App\Filament\Pages\Tenancy\RegisterTeam;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -24,10 +26,12 @@ class DashboardPanelProvider extends PanelProvider
     {
         return $panel
             ->default()
+            ->font('Poppins')
             ->id('dashboard')
             ->path('dashboard')
             ->login()
             ->registration()
+            ->passwordReset()
             ->colors([
                 'primary' => Color::Amber,
             ])
@@ -37,10 +41,10 @@ class DashboardPanelProvider extends PanelProvider
                 Pages\Dashboard::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
-            ->widgets([
-                Widgets\AccountWidget::class,
-                Widgets\FilamentInfoWidget::class,
-            ])
+            // ->widgets([
+            //     Widgets\AccountWidget::class,
+            //     Widgets\FilamentInfoWidget::class,
+            // ])
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
@@ -54,6 +58,8 @@ class DashboardPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
-            ]);
+            ])
+            ->tenant(Team::class)
+            ->tenantRegistration(RegisterTeam::class);
     }
 }

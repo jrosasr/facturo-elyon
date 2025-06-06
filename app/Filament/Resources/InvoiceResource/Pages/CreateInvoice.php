@@ -22,7 +22,7 @@ class CreateInvoice extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        $data['status'] = 'unpaid'; // Establecer estado pendiente por defecto
+        $data['status'] = 'unpaid';
         return $data;
     }
 
@@ -54,7 +54,7 @@ class CreateInvoice extends CreateRecord
                 'status' => $data['status'],
                 'details' => $data['details'],
                 'client_id' => $data['client_id'],
-                'user_id' => auth()->id(),
+                'team_id' => auth()->user()->currentTeam()->id
             ]);
 
             $productsData = [];

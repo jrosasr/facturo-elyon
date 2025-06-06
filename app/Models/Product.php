@@ -5,7 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
 use App\Casts\Money;
+use App\Models\Team;
 
 class Product extends Model
 {
@@ -19,7 +21,7 @@ class Product extends Model
         'status',
         'image',
         'category_id',
-        'user_id',
+        'team_id',
     ];
 
     protected $casts = [
@@ -40,8 +42,8 @@ class Product extends Model
             ->withPivot('quantity', 'price');
     }
 
-    public function user(): BelongsTo
+    public function team(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Team::class);
     }
 }

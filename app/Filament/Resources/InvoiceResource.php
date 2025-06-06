@@ -15,6 +15,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -59,7 +60,7 @@ class InvoiceResource extends Resource
                         Forms\Components\TextInput::make('phone'),
                         Forms\Components\Textarea::make('address'),
                     ]),
-                
+
                 Forms\Components\Select::make('status')
                     ->options([
                         'unpaid' => 'Pendiente',
@@ -70,21 +71,23 @@ class InvoiceResource extends Resource
                     ->required()
                     ->label('Estado')
                     ->visible(fn (string $operation): bool => $operation === 'edit'),
-                
+
                 Forms\Components\DatePicker::make('date')
                     ->label('Fecha')
                     ->required()
                     ->default(now()),
-                
+
                 Forms\Components\Repeater::make('invoice_products')
                     ->label('Productos')
                     ->schema([
+                        Forms\Components\Hidden::make('team_id')
+                            ->default(auth()->user()->currentTeam()->id),
                         Forms\Components\Select::make('product_id')
                             ->label('Producto')
                             ->required()
                             ->searchable()
                             ->reactive()
-                            ->options(Product::where('user_id', auth()->id())->pluck('name', 'id'))
+                            ->options(Product::where('team_id', auth()->user()->currentTeam()->id)->pluck('name', 'id'))
                             ->afterStateUpdated(function ($state, Forms\Set $set) {
                                 $product = Product::find($state);
                                 if ($product) {
@@ -92,7 +95,7 @@ class InvoiceResource extends Resource
                                     $set('available_stock', $product->stock);
                                 }
                             }),
-                        
+
                         Forms\Components\TextInput::make('quantity')
                             ->label('Cantidad')
                             ->required()
@@ -104,7 +107,7 @@ class InvoiceResource extends Resource
                                 $price = $get('price') ?? 0;
                                 $set('subtotal', $state * $price);
                             }),
-                        
+
                         Forms\Components\TextInput::make('price')
                             ->label('Precio Unitario')
                             ->numeric()
@@ -118,8 +121,6 @@ class InvoiceResource extends Resource
                             })
                             ->dehydrateStateUsing(fn ($state) => $state * 100), // Convertir a centavos al guardar
 
-
-                        
                         Forms\Components\Placeholder::make('subtotal')
                             ->label('Subtotal')
                             ->content(function (Forms\Get $get) {
@@ -129,7 +130,7 @@ class InvoiceResource extends Resource
                     ->columns(4)
                     ->columnSpanFull()
                     ->live(),
-                
+
                 Forms\Components\Placeholder::make('total')
                     ->label('Total Factura')
                     ->content(function (Forms\Get $get) {
@@ -138,7 +139,7 @@ class InvoiceResource extends Resource
                     })
                     ->extraAttributes(['class' => 'text-xl font-bold'])
                     ->columnSpanFull(),
-                
+
                 Forms\Components\Textarea::make('details')
                     ->label('Notas')
                     ->columnSpanFull(),
@@ -150,7 +151,7 @@ class InvoiceResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('user.name')
+                Tables\Columns\TextColumn::make('client.name')
                     ->numeric()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('date')
@@ -180,14 +181,30 @@ class InvoiceResource extends Resource
                     $invoiceData = $record->toArray();
                     $productsData = $record->products->toArray();
                     $clientData = $record->client->toArray();
-                    $userData = $record->user->toArray();
+                    $teamLogoPath = auth()->user()->currentTeam()->logo;
+                    $logoExists = Storage::disk('public')->exists($teamLogoPath); // Check if the file exists
+
+                    $base64Logo = '';
+                    if ($logoExists) {
+                        $logoContents = Storage::disk('public')->get($teamLogoPath);
+                        $base64Logo = 'data:image/' . pathinfo($teamLogoPath, PATHINFO_EXTENSION) . ';base64,' . base64_encode($logoContents);
+                    }
+
+                    // Get the team details
+                    $teamName = auth()->user()->currentTeam()->name;
+                    $teamRif = auth()->user()->currentTeam()->rif; // Assuming 'rif' is an attribute on your Team model
+                    $teamAddress = auth()->user()->currentTeam()->address; // Assuming 'address' is an attribute on your Team model
+
 
                     // Pasar los datos a la vista (asegúrate de crear esta vista)
                     $pdf = Pdf::loadView('pdf.invoice', [
                         'invoice' => $invoiceData,
                         'products' => $productsData,
                         'client' => $clientData,
-                        'user' => $userData,
+                        'base64Logo' => $base64Logo,
+                        'teamName' => $teamName,
+                        'teamRif' => $teamRif,
+                        'teamAddress' => $teamAddress,
                     ]);
 
                     // Descargar el PDF

@@ -6,12 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+use App\Models\Team;
 class Category extends Model
 {
     protected $fillable = [
         'name',
         'description',
-        'user_id',
+        'team_id',
     ];
 
     public function products(): BelongsToMany
@@ -19,8 +20,8 @@ class Category extends Model
         return $this->belongsToMany(Product::class, 'category_product', 'category_id', 'product_id');
     }
 
-    public function user(): BelongsTo
+    public function team(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Team::class);
     }
 }

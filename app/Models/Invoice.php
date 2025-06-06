@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Casts\Attribute; // Import Attribute class
 
+use App\Models\Team;
 
 class Invoice extends Model
 {
@@ -15,16 +16,16 @@ class Invoice extends Model
         'status',
         'details',
         'client_id',
-        'user_id',
+        'team_id',
     ];
 
     protected $appends = [
         'total',
     ];
 
-    public function user(): BelongsTo
+    public function team(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Team::class);
     }
 
     public function products(): BelongsToMany

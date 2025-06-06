@@ -48,9 +48,6 @@ class CategoryResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(function (Builder $query)  {
-                $query->where('user_id', auth()->user()->id);
-            })
             ->columns([
                 Tables\Columns\TextColumn::make('id')
                     ->sortable()

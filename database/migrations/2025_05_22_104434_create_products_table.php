@@ -22,10 +22,10 @@ return new class extends Migration
 
             $table->enum('status', ['active', 'inactive'])->default('active');
             $table->string('image')->nullable();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('team_id')->constrained()->onDelete('cascade');
 
-            // llave unica usando en user_id y el nombre del producto
-            $table->unique(['user_id', 'name'], 'user_product_unique');
+            // llave unica usando en team_id y el nombre del producto
+            $table->unique(['team_id', 'name'], 'user_product_unique');
 
             $table->timestamps();
         });

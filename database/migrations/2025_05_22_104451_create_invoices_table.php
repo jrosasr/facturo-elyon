@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('invoices', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('team_id')->constrained()->onDelete('cascade');
 
             // id del cliente
             $table->foreignId('client_id')->constrained()->onDelete('cascade');
@@ -27,8 +27,8 @@ return new class extends Migration
             // detalles de la factura
             $table->text('details')->nullable();
 
-            // llave unica usando en user_id y el nombre del producto
-            $table->unique(['user_id', 'id'], 'user_invoice_unique');
+            // llave unica usando en team_id y el nombre del producto
+            $table->unique(['team_id', 'id'], 'user_invoice_unique');
             $table->timestamps();
         });
     }
