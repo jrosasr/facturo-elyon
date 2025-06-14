@@ -21,7 +21,7 @@ class CategoryResource extends Resource
     protected static ?string $pluralModelLabel = 'Categorías';
 
     protected static ?string $navigationIcon = 'heroicon-o-users';
-    protected static ?string $navigationGroup = 'Configuración';
+    protected static ?string $navigationGroup = 'General';
     // protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
@@ -71,6 +71,7 @@ class CategoryResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
+                Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

@@ -54,6 +54,7 @@ class InvoiceResource extends Resource
                     ->searchable()
                     ->preload()
                     ->relationship('client', 'name')
+                    ->disabled(fn (Forms\Get $get): bool => $get('status') === 'canceled' || $get('status') === 'paid')
                     ->createOptionForm([
                         Forms\Components\TextInput::make('name')
                             ->required(),
@@ -61,24 +62,16 @@ class InvoiceResource extends Resource
                         Forms\Components\Textarea::make('address'),
                     ]),
 
-                Forms\Components\Select::make('status')
-                    ->options([
-                        'unpaid' => 'Pendiente',
-                        'paid' => 'Pagada',
-                        'canceled' => 'Cancelada',
-                    ])
-                    ->default('unpaid')
-                    ->required()
-                    ->label('Estado')
-                    ->visible(fn (string $operation): bool => $operation === 'edit'),
-
                 Forms\Components\DatePicker::make('date')
                     ->label('Fecha')
                     ->required()
+                    // deshabilitar cuando el estatus es canceled
+                    ->disabled(fn (Forms\Get $get): bool => $get('status') === 'canceled' || $get('status') === 'paid')
                     ->default(now()),
 
                 Forms\Components\Repeater::make('invoice_products')
                     ->label('Productos')
+                    ->disabled(fn (Forms\Get $get): bool => $get('status') === 'canceled' || $get('status') === 'paid')
                     ->schema([
                         Forms\Components\Hidden::make('team_id')
                             ->default(auth()->user()->currentTeam()->id),
@@ -142,6 +135,7 @@ class InvoiceResource extends Resource
 
                 Forms\Components\Textarea::make('details')
                     ->label('Notas')
+                    ->disabled(fn (Forms\Get $get): bool => $get('status') === 'canceled' || $get('status') === 'paid')
                     ->columnSpanFull(),
             ])
             ->columns(2);
@@ -158,6 +152,18 @@ class InvoiceResource extends Resource
                     ->date()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('status')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'unpaid' => 'gray',
+                        'canceled' => 'danger',
+                        'paid' => 'success',
+                    })
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'unpaid' => 'En Proceso',
+                        'canceled' => 'Cancelada',
+                        'paid' => 'Completada',
+                        default => $state,
+                    })
                     ->searchable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
@@ -172,46 +178,48 @@ class InvoiceResource extends Resource
                 //
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
                 TableAction::make('generate_pdf')  // Usa TableAction aquí
-                ->label('Generar PDF')
-                ->icon('heroicon-o-document-arrow-down')
-                ->action(function (Invoice $record) {
-                    // Obtener los datos necesarios para la factura
-                    $invoiceData = $record->toArray();
-                    $productsData = $record->products->toArray();
-                    $clientData = $record->client->toArray();
-                    $teamLogoPath = auth()->user()->currentTeam()->logo;
-                    $logoExists = Storage::disk('public')->exists($teamLogoPath); // Check if the file exists
+                    ->label('Generar Factura')
+                    ->color('info')
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->action(function (Invoice $record) {
+                        // Obtener los datos necesarios para la factura
+                        $invoiceData = $record->toArray();
+                        $productsData = $record->products->toArray();
+                        $clientData = $record->client->toArray();
+                        $teamLogoPath = auth()->user()->currentTeam()->logo;
+                        $logoExists = Storage::disk('public')->exists($teamLogoPath); // Check if the file exists
 
-                    $base64Logo = '';
-                    if ($logoExists) {
-                        $logoContents = Storage::disk('public')->get($teamLogoPath);
-                        $base64Logo = 'data:image/' . pathinfo($teamLogoPath, PATHINFO_EXTENSION) . ';base64,' . base64_encode($logoContents);
-                    }
+                        $base64Logo = '';
+                        if ($logoExists) {
+                            $logoContents = Storage::disk('public')->get($teamLogoPath);
+                            $base64Logo = 'data:image/' . pathinfo($teamLogoPath, PATHINFO_EXTENSION) . ';base64,' . base64_encode($logoContents);
+                        }
 
-                    // Get the team details
-                    $teamName = auth()->user()->currentTeam()->name;
-                    $teamRif = auth()->user()->currentTeam()->rif; // Assuming 'rif' is an attribute on your Team model
-                    $teamAddress = auth()->user()->currentTeam()->address; // Assuming 'address' is an attribute on your Team model
+                        // Get the team details
+                        $teamName = auth()->user()->currentTeam()->name;
+                        $teamRif = auth()->user()->currentTeam()->rif; // Assuming 'rif' is an attribute on your Team model
+                        $teamAddress = auth()->user()->currentTeam()->address; // Assuming 'address' is an attribute on your Team model
 
 
-                    // Pasar los datos a la vista (asegúrate de crear esta vista)
-                    $pdf = Pdf::loadView('pdf.invoice', [
-                        'invoice' => $invoiceData,
-                        'products' => $productsData,
-                        'client' => $clientData,
-                        'base64Logo' => $base64Logo,
-                        'teamName' => $teamName,
-                        'teamRif' => $teamRif,
-                        'teamAddress' => $teamAddress,
-                    ]);
+                        // Pasar los datos a la vista (asegúrate de crear esta vista)
+                        $pdf = Pdf::loadView('pdf.invoice', [
+                            'invoice' => $invoiceData,
+                            'products' => $productsData,
+                            'client' => $clientData,
+                            'base64Logo' => $base64Logo,
+                            'teamName' => $teamName,
+                            'teamRif' => $teamRif,
+                            'teamAddress' => $teamAddress,
+                        ]);
 
-                    // Descargar el PDF
-                    return response()->streamDownload(function () use ($pdf) {
-                        echo $pdf->stream();
-                    }, "factura-{$record->id}.pdf");
-                }),
+                        // Descargar el PDF
+                        return response()->streamDownload(function () use ($pdf) {
+                            echo $pdf->stream();
+                        }, "factura-{$record->id}.pdf");
+                    }),
+                    Tables\Actions\EditAction::make(),
+                    Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

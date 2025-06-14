@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model; // Import Model
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Filament\Notifications\Notification;
+use Filament\Actions\Action;
 use App\Models\Product;
 
 class EditInvoice extends EditRecord
@@ -23,34 +24,76 @@ class EditInvoice extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\Action::make('cancel')
+            Actions\Action::make('paid')
+                ->label('Completar Factura')
+                ->color('success')
+                ->icon('heroicon-o-check-circle')
+                ->requiresConfirmation()
+                ->before(function () {
+                    DB::transaction(function () {
+                        $this->getRecord()->update(['status' => 'paid']);
+                        Notification::make()
+                            ->success()
+                            ->title('Factura completada')
+                            ->body('La factura ha sido marcada como pagada.')
+                            ->send();
+                    });
+                    $this->redirect($this->getResource()::getUrl('index'));
+                })
+                ->visible(fn (): bool => $this->getRecord()->status === 'unpaid'),
+            Actions\Action::make('canceled')
                 ->label('Cancelar Factura')
                 ->color('danger')
                 ->icon('heroicon-o-x-circle')
                 ->requiresConfirmation()
-                ->action(function () {
+                ->before(function () {
                     DB::transaction(function () {
                         $this->getRecord()->update(['status' => 'canceled']);
                         $this->getRecord()->restoreStock();
                         Notification::make()
                             ->success()
-                            ->title('Factura cancelada')
+                            ->title('Cancelar factura')
                             ->body('El stock de productos ha sido restaurado.')
                             ->send();
                     });
                     $this->redirect($this->getResource()::getUrl('index'));
                 })
-                ->visible(fn (): bool => $this->getRecord()->status !== 'canceled'),
-            
-            Actions\DeleteAction::make()
-                ->before(function (Actions\DeleteAction $action) {
+                ->visible(fn (): bool => $this->getRecord()->status === 'unpaid'),
+            Actions\Action::make('unpaid')
+                ->label('Restaurar Factura')
+                ->color('gray')
+                ->icon('heroicon-o-check-circle')
+                ->requiresConfirmation()
+                ->before(function () {
                     DB::transaction(function () {
-                        if ($this->getRecord()->status !== 'canceled') {
-                            $this->getRecord()->restoreStock();
-                        }
+                        $this->getRecord()->update(['status' => 'unpaid']);
+                        Notification::make()
+                            ->success()
+                            ->title('Factura restaurada')
+                            ->body('La factura ha sido restaurada y puesta de nuevo en estado pendiente.')
+                            ->send();
                     });
-                }),
+                    $this->redirect($this->getResource()::getUrl('index'));
+                })
+                ->visible(fn (): bool => $this->getRecord()->status === 'canceled'),
         ];
+    }
+
+    protected function getFormActions(): array
+    {
+        $options = [
+            ...parent::getFormActions()
+        ];
+
+        if ($this->getRecord()->status === 'canceled' || $this->getRecord()->status === 'paid') {
+            $options = [
+            //     Action::make('close')
+            //     ->action('close')
+            //     ->label('Cancelar')
+            //     ->color('gray'),
+            ];
+        }
+        return $options;
     }
 
     /**
@@ -111,7 +154,7 @@ class EditInvoice extends EditRecord
             $record->update([
                 'client_id' => $data['client_id'],
                 'date' => $data['date'],
-                'status' => $data['status'],
+                'status' => $record->status,
                 'details' => $data['details'],
             ]);
 
@@ -137,5 +180,4 @@ class EditInvoice extends EditRecord
             throw $e;
         }
     }
-
 }

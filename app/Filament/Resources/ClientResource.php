@@ -22,8 +22,8 @@ class ClientResource extends Resource
     protected static ?string $modelLabel = 'Cliente';
     protected static ?string $pluralModelLabel = 'Clientes';
 
-    // protected static ?string $navigationGroup = 'Configuración';
-    // protected static ?int $navigationSort = 2;
+    protected static ?string $navigationGroup = 'General';
+    protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {

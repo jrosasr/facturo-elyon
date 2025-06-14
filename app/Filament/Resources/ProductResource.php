@@ -65,6 +65,24 @@ class ProductResource extends Resource
                     ->label('Stock mínimo')
                     ->helperText('El stock mínimo es el nivel de inventario que activa una alerta para reabastecer el producto.')
                     ->default(0),
+                Forms\Components\Select::make('category_ids')
+                    ->label('Categorías')
+                    ->multiple()
+                    ->preload()
+                    ->searchable()
+                    ->relationship('categories', 'name') // Asumiendo que tu relación se llama 'categories' y el nombre es 'name'
+                    ->options(Category::all()->pluck('name', 'id')) // Asumiendo que el modelo Category tiene 'name' y 'id'
+                    ->createOptionForm([
+                        Forms\Components\TextInput::make('name')
+                            ->label('Nombre de la categoría')
+                            ->required(),
+                        Forms\Components\Textarea::make('description')
+                            ->label('Descripción de la categoría'),
+                        Forms\Components\Hidden::make('status')
+                            ->default('active'),
+                        Forms\Components\Hidden::make('team_id')
+                            ->default(auth()->user()->currentTeam()->id)
+                    ]),
                 Forms\Components\Select::make('status')
                     ->options([
                         'active' => 'Activo',
@@ -84,25 +102,6 @@ class ProductResource extends Resource
                     ->default(function ($record) {
                         return $record?->photo ? [asset('storage/'.$record->photo)] : null;
                     }),
-                Forms\Components\Select::make('category_ids')
-                    ->label('Categorías')
-                    ->multiple()
-                    ->preload()
-                    ->searchable()
-                    ->relationship('categories', 'name') // Asumiendo que tu relación se llama 'categories' y el nombre es 'name'
-                    ->options(Category::all()->pluck('name', 'id')) // Asumiendo que el modelo Category tiene 'name' y 'id'
-                    ->createOptionForm([
-                        Forms\Components\TextInput::make('name')
-                            ->label('Nombre de la categoría')
-                            ->required(),
-                        Forms\Components\Textarea::make('description')
-                            ->label('Descripción de la categoría'),
-                        Forms\Components\Hidden::make('status')
-                            ->default('active'),
-                        Forms\Components\Hidden::make('team_id')
-                            ->default(auth()->user()->currentTeam()->id)
-                    ]),
-
             ]);
     }
 

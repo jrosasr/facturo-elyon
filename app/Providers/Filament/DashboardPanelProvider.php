@@ -2,23 +2,25 @@
 
 namespace App\Providers\Filament;
 
-use App\Models\Team;
-use App\Filament\Pages\Tenancy\RegisterTeam;
-use Filament\Http\Middleware\Authenticate;
-use Filament\Http\Middleware\AuthenticateSession;
-use Filament\Http\Middleware\DisableBladeIconComponents;
-use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Pages;
 use Filament\Panel;
-use Filament\PanelProvider;
-use Filament\Support\Colors\Color;
+use App\Models\Team;
 use Filament\Widgets;
-use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
-use Illuminate\Cookie\Middleware\EncryptCookies;
-use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
-use Illuminate\Routing\Middleware\SubstituteBindings;
+use Filament\PanelProvider;
+use Filament\Navigation\MenuItem;
+use Filament\Support\Colors\Color;
+use Filament\Http\Middleware\Authenticate;
+use App\Filament\Pages\Tenancy\RegisterTeam;
+use App\Filament\Pages\Tenancy\EditTeamProfile;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Cookie\Middleware\EncryptCookies;
+use Filament\Http\Middleware\AuthenticateSession;
+use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Filament\Http\Middleware\DisableBladeIconComponents;
+use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 
 class DashboardPanelProvider extends PanelProvider
 {
@@ -60,6 +62,12 @@ class DashboardPanelProvider extends PanelProvider
                 Authenticate::class,
             ])
             ->tenant(Team::class)
-            ->tenantRegistration(RegisterTeam::class);
+            ->tenantRegistration(RegisterTeam::class)
+            ->tenantProfile(EditTeamProfile::class)
+            ->userMenuItems([
+                'profile' => MenuItem::make()->label('Perfil'),
+                'logout' => MenuItem::make()->label('Cerrar sesión'),
+            ])
+            ->sidebarCollapsibleOnDesktop();
     }
 }

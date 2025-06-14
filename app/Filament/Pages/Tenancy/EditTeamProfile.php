@@ -4,13 +4,13 @@ namespace App\Filament\Pages\Tenancy;
 
 use Filament\Forms;
 use Filament\Forms\Form;
-use Filament\Pages\Tenancy\RegisterTenant;
+use Filament\Pages\Tenancy\EditTenantProfile;
 
-class RegisterTeam extends RegisterTenant
+class EditTeamProfile extends EditTenantProfile
 {
     public static function getLabel(): string
     {
-        return 'Nueva organización';
+        return 'Editar organización';
     }
 
     public function form(Form $form): Form
@@ -42,14 +42,5 @@ class RegisterTeam extends RegisterTenant
                         return $record?->logo ? [asset('storage/'.$record->logo)] : null;
                     }),
             ]);
-    }
-
-    protected function handleRegistration(array $data): \App\Models\Team
-    {
-        $team = \App\Models\Team::create($data);
-
-        $team->members()->attach(auth()->user());
-
-        return $team;
     }
 }
