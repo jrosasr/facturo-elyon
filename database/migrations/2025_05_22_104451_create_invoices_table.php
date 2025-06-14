@@ -21,6 +21,9 @@ return new class extends Migration
             // fecha de la factura
             $table->date('date');
 
+            // total de la factura
+            $table->integer('total')->default(0);
+
             // estado de la factura
             $table->enum('status', ['paid', 'unpaid', 'canceled'])->default('unpaid');
 

@@ -109,11 +109,14 @@ class EditInvoice extends EditRecord
                 $data['invoice_products'][] = [
                     'product_id' => $product->id,
                     'quantity' => $product->pivot->quantity,
-                    'price' => $product->pivot->price / 100,
-                    'total_price' => ($product->pivot->quantity * $product->pivot->price) / 100,
+                    'price' => $product->pivot->price, // Keep price in cents for calculations
+                    'total_price' => ($product->pivot->quantity * $product->pivot->price), // This is the total for the line item in cents
                 ];
             }
         }
+        // The total for the entire invoice will be fetched directly from the 'total' column
+        // No explicit 'total' entry needed in $data for filling if it's not a form field directly.
+        // If you have a Filament field for 'total' on the form, it will be automatically populated.
 
         return $data;
     }
@@ -131,7 +134,7 @@ class EditInvoice extends EditRecord
     {
         DB::beginTransaction();
         try {
-            // Validación de stock
+            // Validation for stock before any changes
             $insufficientStockProducts = [];
             foreach ($data['invoice_products'] as $product) {
                 $productModel = Product::find($product['product_id']);
@@ -146,35 +149,41 @@ class EditInvoice extends EditRecord
             if (!empty($insufficientStockProducts)) {
                 DB::rollback();
                 Notification::make()
-                    ->title('Error al crear la factura')
+                    ->title('Error al actualizar la factura')
                     ->body('No hay suficiente stock para los siguientes productos: ' . implode(', ', $insufficientStockProducts))
                     ->danger()
                     ->send();
 
-                // Throw a ValidationException to display an error on the form
                 throw ValidationException::withMessages([
                     'invoice_products' => 'No hay suficiente stock para los siguientes productos: ' . implode(', ', $insufficientStockProducts),
                 ]);
             }
 
+            // Calculate the new total for the invoice
+            $newCalculatedTotal = 0;
+            foreach ($data['invoice_products'] as $product) {
+                $newCalculatedTotal += ($product['quantity'] * $product['price']);
+            }
+
             $record->update([
                 'client_id' => $data['client_id'],
                 'date' => $data['date'],
-                'status' => $record->status,
+                'status' => $record->status, // Status is handled by header actions
                 'details' => $data['details'],
+                'total' => $newCalculatedTotal / 100, // Convert total back to dollars
             ]);
 
             $productsData = [];
             foreach ($data['invoice_products'] as $product) {
                 $productsData[$product['product_id']] = [
                     'quantity' => $product['quantity'],
-                    'price' => $product['price'], // Ya viene en centavos
+                    'price' => $product['price'], // Price already in cents
                 ];
 
                 $productModel = Product::find($product['product_id']);
                 $originalQuantity = $record->products->find($product['product_id'])?->pivot->quantity ?? 0;
                 $quantityDifference = $product['quantity'] - $originalQuantity;
-                $productModel->stock -= $quantityDifference;
+                $productModel->stock -= $quantityDifference; // Adjust stock based on difference
                 $productModel->save();
 
                 $receiver = auth()->user();

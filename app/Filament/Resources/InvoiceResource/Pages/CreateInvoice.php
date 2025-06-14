@@ -23,6 +23,17 @@ class CreateInvoice extends CreateRecord
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $data['status'] = 'unpaid';
+
+        // Calculate total from invoice_products before creation
+        $calculatedTotal = 0;
+        foreach ($data['invoice_products'] as $product) {
+            // Price comes in cents, no division by 100 needed here if it's already in cents.
+            // If the price in the form is in dollars/VEF and then converted to cents,
+            // ensure 'price' is already in cents when it reaches this point.
+            $calculatedTotal += ($product['quantity'] * $product['price']);
+        }
+        $data['total'] = $calculatedTotal / 100; // Assign the calculated total to the data array
+
         return $data;
     }
 
@@ -58,6 +69,7 @@ class CreateInvoice extends CreateRecord
                 'status' => $data['status'],
                 'details' => $data['details'],
                 'client_id' => $data['client_id'],
+                'total' => $data['total'],
                 'team_id' => auth()->user()->currentTeam()->id
             ]);
 

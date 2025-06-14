@@ -2,12 +2,12 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Casts\Attribute; // Import Attribute class
-
+use App\Casts\Money;
 use App\Models\Team;
+use Illuminate\Database\Eloquent\Model;
+
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Invoice extends Model
 {
@@ -16,11 +16,12 @@ class Invoice extends Model
         'status',
         'details',
         'client_id',
+        'total',
         'team_id',
     ];
 
-    protected $appends = [
-        'total',
+    protected $casts = [
+        'total' => Money::class,
     ];
 
     public function team(): BelongsTo
@@ -37,13 +38,6 @@ class Invoice extends Model
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
-    }
-
-    protected function total(): Attribute
-    {
-        return Attribute::make(
-            get: fn () => $this->products->sum(fn ($product) => $product->pivot->quantity * $product->pivot->price),
-        );
     }
 
     public function restoreStock(): void
