@@ -8,8 +8,8 @@ use Filament\Resources\Pages\CreateRecord;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use App\Models\Product;
+use Illuminate\Validation\ValidationException;
 
 class CreateInvoice extends CreateRecord
 {
@@ -46,7 +46,11 @@ class CreateInvoice extends CreateRecord
                     ->body('No hay suficiente stock para los siguientes productos: ' . implode(', ', $insufficientStockProducts))
                     ->danger()
                     ->send();
-                return null; // O lanzar una excepción si prefieres
+
+                // Throw a ValidationException to display an error on the form
+                throw ValidationException::withMessages([
+                    'invoice_products' => 'No hay suficiente stock para los siguientes productos: ' . implode(', ', $insufficientStockProducts),
+                ]);
             }
 
             $invoice = static::getModel()::create([
@@ -67,6 +71,16 @@ class CreateInvoice extends CreateRecord
                 $productModel = Product::find($product['product_id']);
                 $productModel->stock -= $product['quantity'];
                 $productModel->save();
+
+                $receiver = auth()->user();
+
+                if ($productModel->stock <= $productModel->stock_min) {
+                    Notification::make()
+                        ->title('Alerta de Stock Bajo')
+                        ->body('Solo quedan ' . $productModel->stock . ' unidades de ' . $productModel->name)
+                        ->danger()
+                        ->sendToDatabase($receiver);
+                }
             }
 
             $invoice->products()->sync($productsData);

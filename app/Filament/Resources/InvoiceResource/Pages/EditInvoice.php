@@ -2,15 +2,16 @@
 
 namespace App\Filament\Resources\InvoiceResource\Pages;
 
-use App\Filament\Resources\InvoiceResource;
 use Filament\Actions;
-use Filament\Resources\Pages\EditRecord;
-use Illuminate\Database\Eloquent\Model; // Import Model
+use App\Models\Product;
+use Filament\Actions\Action;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Filament\Notifications\Notification;
-use Filament\Actions\Action;
-use App\Models\Product;
+use Filament\Resources\Pages\EditRecord;
+use App\Filament\Resources\InvoiceResource;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Database\Eloquent\Model; // Import Model
 
 class EditInvoice extends EditRecord
 {
@@ -86,12 +87,7 @@ class EditInvoice extends EditRecord
         ];
 
         if ($this->getRecord()->status === 'canceled' || $this->getRecord()->status === 'paid') {
-            $options = [
-            //     Action::make('close')
-            //     ->action('close')
-            //     ->label('Cancelar')
-            //     ->color('gray'),
-            ];
+            $options = [];
         }
         return $options;
     }
@@ -139,16 +135,26 @@ class EditInvoice extends EditRecord
             $insufficientStockProducts = [];
             foreach ($data['invoice_products'] as $product) {
                 $productModel = Product::find($product['product_id']);
-                $originalQuantity = $record->products->find($product['product_id'])?->pivot->quantity ?? 0;
+                $originalQuantity = $productModel->stock + $record->products->find($product['product_id'])?->pivot->quantity ?? 0;
                 $quantityDifference = $product['quantity'] - $originalQuantity;
 
-                if ($productModel->stock - $quantityDifference < 0) {
+                if ($originalQuantity - $product['quantity'] < 0) {
                     $insufficientStockProducts[] = $productModel->name;
                 }
             }
 
             if (!empty($insufficientStockProducts)) {
-                // ... (mantener tu lógica de error)
+                DB::rollback();
+                Notification::make()
+                    ->title('Error al crear la factura')
+                    ->body('No hay suficiente stock para los siguientes productos: ' . implode(', ', $insufficientStockProducts))
+                    ->danger()
+                    ->send();
+
+                // Throw a ValidationException to display an error on the form
+                throw ValidationException::withMessages([
+                    'invoice_products' => 'No hay suficiente stock para los siguientes productos: ' . implode(', ', $insufficientStockProducts),
+                ]);
             }
 
             $record->update([
@@ -170,6 +176,16 @@ class EditInvoice extends EditRecord
                 $quantityDifference = $product['quantity'] - $originalQuantity;
                 $productModel->stock -= $quantityDifference;
                 $productModel->save();
+
+                $receiver = auth()->user();
+
+                if ($productModel->stock <= $productModel->stock_min) {
+                    Notification::make()
+                        ->title('Alerta de Stock Bajo')
+                        ->body('Solo quedan ' . $productModel->stock . ' unidades de ' . $productModel->name)
+                        ->danger()
+                        ->sendToDatabase($receiver);
+                }
             }
 
             $record->products()->sync($productsData);

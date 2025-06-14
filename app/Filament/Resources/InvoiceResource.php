@@ -60,6 +60,8 @@ class InvoiceResource extends Resource
                             ->required(),
                         Forms\Components\TextInput::make('phone'),
                         Forms\Components\Textarea::make('address'),
+                        Forms\Components\Hidden::make('team_id')
+                            ->default(auth()->user()->currentTeam()->id),
                     ]),
 
                 Forms\Components\DatePicker::make('date')
