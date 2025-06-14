@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Widgets\InvoiceRevenueChart;
 use Filament\Pages;
 use Filament\Panel;
 use App\Models\Team;
@@ -43,10 +44,11 @@ class DashboardPanelProvider extends PanelProvider
                 Pages\Dashboard::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
-            // ->widgets([
-            //     Widgets\AccountWidget::class,
-            //     Widgets\FilamentInfoWidget::class,
-            // ])
+            ->widgets([
+                // Widgets\AccountWidget::class,
+                // Widgets\FilamentInfoWidget::class,
+                InvoiceRevenueChart::class,
+            ])
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
