@@ -2,21 +2,22 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\ProductResource\Pages;
-use App\Filament\Resources\ProductResource\RelationManagers;
+use Filament\Forms;
+use Filament\Tables;
 use App\Models\Product;
 use App\Models\Category;
-use Filament\Forms;
 use Filament\Forms\Form;
-use Filament\Resources\Resource;
-use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Resources\Components\Tab;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Filament\Tables\Actions\Action; // Importa la clase Action
 use Barryvdh\DomPDF\Facade\Pdf;
+use Filament\Resources\Resource;
 use Illuminate\Support\Facades\View;
+use Filament\Resources\Components\Tab;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Database\Eloquent\Builder;
+use App\Filament\Resources\ProductResource\Pages;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
+use App\Filament\Resources\ProductResource\RelationManagers;
+use Filament\Tables\Actions\Action; // Importa la clase Action
 
 class ProductResource extends Resource
 {
@@ -172,6 +173,29 @@ class ProductResource extends Resource
                     ->label('Generar PDF')
                     ->icon('heroicon-o-document-arrow-down')
                     ->action(function () {
+                        // Obtener el Team (tenant) actual
+                        $currentTeam = auth()->user()->currentTeam(); // O auth()->user()->currentTeam();
+
+                        // Preparar la información de la empresa
+                        $teamName = $currentTeam->name ?? 'Nombre de la Empresa';
+                        $teamRif = $currentTeam->rif ?? 'RIF no disponible';
+                        $teamAddress = $currentTeam->address ?? 'Dirección no disponible';
+
+                        $teamLogoPath = auth()->user()->currentTeam()->logo;
+                        $logoExists = Storage::disk('public')->exists($teamLogoPath); // Check if the file exists
+                        // Asegúrate de que tu modelo Team tenga un campo 'logo_path' y el accessor getBase64LogoAttribute
+                        $base64Logo = '';
+                        if ($logoExists) {
+                            $logoContents = Storage::disk('public')->get($teamLogoPath);
+                            $base64Logo = 'data:image/' . pathinfo($teamLogoPath, PATHINFO_EXTENSION) . ';base64,' . base64_encode($logoContents);
+                        }
+
+                        // La "factura" para el header.blade.php (simplemente para pasar una fecha y satisfacer el header)
+                        $invoice = [
+                            'date' => now(), // Fecha actual para el reporte de productos
+                            'id' => 'REPORTE_PROD', // O cualquier ID de reporte que desees
+                        ];
+
                         $productsByCategory = Category::with(['products' => function ($query) {
                             $query->where('team_id', auth()->user()->currentTeam()->id);
                         }])
@@ -180,12 +204,21 @@ class ProductResource extends Resource
                             })
                             ->get();
 
-                        $pdf = Pdf::loadView('pdf.products', ['productsByCategory' => $productsByCategory]);
+                        // Pasa todos los datos necesarios a la vista
+                        $pdf = Pdf::loadView('pdf.products', [
+                            'productsByCategory' => $productsByCategory,
+                            'teamName' => $teamName,
+                            'teamRif' => $teamRif,
+                            'teamAddress' => $teamAddress,
+                            'base64Logo' => $base64Logo,
+                            'invoice' => $invoice, // Pasar la información de la "factura" para el header
+                        ]);
 
                         return response()->streamDownload(function () use ($pdf) {
                             echo $pdf->stream('products.pdf');
                         }, 'products.pdf');
                     }),
+
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

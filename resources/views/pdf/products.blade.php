@@ -1,42 +1,29 @@
-// resources/views/pdf/products.blade.php
 <!DOCTYPE html>
 <html lang="es">
+
+@php
+    function formatDate($date): string {
+        return Carbon\Carbon::parse($date)->format('d/m/Y');
+    }
+@endphp
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lista de Productos por Categoría</title>
-    <style>
-        body {
-            font-family: sans-serif;
-        }
-
-        h2 {
-            font-size: 20px;
-            margin-top: 20px;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 10px;
-        }
-
-        th,
-        td {
-            font-size: 12px;
-            border: 1px solid #000;
-            padding: 8px;
-            text-align: left;
-        }
-
-        th {
-            background-color: #f0f0f0;
-        }
-    </style>
+    @include('pdf.partials._styles') {{-- Incluye los estilos aquí --}}
 </head>
 
 <body>
+    @include('pdf.partials._header', [
+        'base64Logo' => $base64Logo ?? null,
+        'teamName' => $teamName ?? null,
+        'teamRif' => $teamRif ?? null,
+        'teamAddress' => $teamAddress ?? null,
+        'invoice' => $invoice ?? ['date' => now()], // Asegúrate de pasar el array $invoice
+        'formatDate' => function($date) { return Carbon\Carbon::parse($date)->format('d/m/Y'); }
+    ])
+
     <h1>Lista de Productos</h1>
 
     @foreach ($productsByCategory as $category)
@@ -60,6 +47,7 @@
             </tbody>
         </table>
     @endforeach
-</body>
 
+    @include('pdf.partials._footer')
+</body>
 </html>

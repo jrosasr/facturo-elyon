@@ -56,6 +56,6 @@ class Team extends Model
      */
     public function currency(): HasOne
     {
-        return $this->hasOne(Currency::class);
+        return $this->hasOne(Currency::class, 'Currency_id');
     }
 }
