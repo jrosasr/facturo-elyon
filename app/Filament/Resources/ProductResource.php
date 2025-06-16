@@ -168,7 +168,6 @@ class ProductResource extends Resource
                 Tables\Actions\EditAction::make(),
             ])
             ->headerActions([
-                Tables\Actions\CreateAction::make(),
                 Action::make('generatePdf')
                     ->label('Generar PDF')
                     ->icon('heroicon-o-document-arrow-down')

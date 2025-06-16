@@ -72,6 +72,8 @@ class DashboardPanelProvider extends PanelProvider
             ])
             ->sidebarCollapsibleOnDesktop()
             ->databaseNotifications()
-            ->databaseNotificationsPolling('5s');
+            ->databaseNotificationsPolling('5s')
+            ->brandLogo(asset('logo.png'))
+            ->brandLogoHeight('50px');
     }
 }

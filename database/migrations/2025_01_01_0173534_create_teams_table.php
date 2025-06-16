@@ -20,6 +20,7 @@ return new class extends Migration
             $table->string('email')->nullable();
             $table->string('logo')->nullable();
             $table->string('rif')->nullable();
+            $table->string('currency_id')->nullable();
 
             $table->timestamps();
         });

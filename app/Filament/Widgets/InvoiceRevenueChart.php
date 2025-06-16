@@ -3,12 +3,11 @@
 namespace App\Filament\Widgets;
 
 use Filament\Widgets\ChartWidget;
-use App\Models\Invoice; // Import your Invoice model
+use App\Models\Invoice;
 use Flowframe\Trend\Trend;
 use Flowframe\Trend\TrendValue;
-use Carbon\Carbon; // For date formatting
-use Filament\Support\RawJs; // For advanced Chart.js options
-// DB is no longer needed for revenue calculation if using 'total' column directly
+use Carbon\Carbon;
+use Filament\Support\RawJs;
 
 class InvoiceRevenueChart extends ChartWidget
 {
@@ -18,7 +17,9 @@ class InvoiceRevenueChart extends ChartWidget
 
     protected int | string | array $columnSpan = 'full';
 
-    public ?string $filter = '30_days'; // Default filter to last 30 days
+    protected static ?string $maxHeight = '500px';
+
+    public ?string $filter = '7_days';
 
     protected function getType(): string
     {

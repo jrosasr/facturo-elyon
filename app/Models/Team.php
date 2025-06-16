@@ -50,4 +50,12 @@ class Team extends Model
     {
         return $this->hasMany(Product::class);
     }
+
+    /**
+     * Get the currency associated with the Team
+     */
+    public function currency(): HasOne
+    {
+        return $this->hasOne(Currency::class);
+    }
 }

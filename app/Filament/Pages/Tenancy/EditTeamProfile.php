@@ -41,6 +41,15 @@ class EditTeamProfile extends EditTenantProfile
                     ->default(function ($record) {
                         return $record?->logo ? [asset('storage/'.$record->logo)] : null;
                     }),
+                Forms\Components\Select::make('currency_id')
+                    ->label('Moneda')
+                    ->relationship('currency', 'name')
+                    ->required()
+                    ->searchable()
+                    ->preload()
+                    ->default(function ($record) {
+                        return $record?->currency_id;
+                    }),
             ]);
     }
 }
