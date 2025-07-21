@@ -50,7 +50,10 @@ class AdminPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
-            ->plugin(\TomatoPHP\FilamentPWA\FilamentPWAPlugin::make())
+            ->plugin(
+                \TomatoPHP\FilamentPWA\FilamentPWAPlugin::make()
+                    ->allowPWASettings(true) // Solo administración de configuración
+            )
             ->authMiddleware([
                 Authenticate::class,
             ]);
