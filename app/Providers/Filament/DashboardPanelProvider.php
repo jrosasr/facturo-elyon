@@ -70,7 +70,6 @@ class DashboardPanelProvider extends PanelProvider
                 'profile' => MenuItem::make()->label('Perfil'),
                 'logout' => MenuItem::make()->label('Cerrar sesión'),
             ])
-            ->plugin(\TomatoPHP\FilamentPWA\FilamentPWAPlugin::make())
             ->sidebarCollapsibleOnDesktop()
             ->databaseNotifications()
             ->databaseNotificationsPolling('5s')
