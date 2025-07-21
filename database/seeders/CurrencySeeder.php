@@ -43,5 +43,16 @@ class CurrencySeeder extends Seeder
             'decimal_separator' => '.',
             'thousands_separator' => ',',
         ]);
+
+        // Peso Chileno
+        Currency::create([
+            'symbol' => '$',
+            'code' => 'CLP',
+            'name' => 'Peso Chileno',
+            'available' => true,
+            'decimal_places' => 2,
+            'decimal_separator' => '.',
+            'thousands_separator' => ',',
+        ]);
     }
 }
