@@ -29,6 +29,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Actions\Action; // Asegúrate de que esta importación está aquí
 use Filament\Tables\Actions\Action as TableAction; // Importa TableAction
 use Illuminate\Support\Facades\View; // Importa la clase View
+use Illuminate\Support\Collection; // Importa Collection correctamente
 
 use Illuminate\Support\Facades\Log;
 
@@ -61,7 +62,7 @@ class InvoiceResource extends Resource
                         Forms\Components\TextInput::make('phone'),
                         Forms\Components\Textarea::make('address'),
                         Forms\Components\Hidden::make('team_id')
-                            ->default(auth()->user()->currentTeam()->id),
+                            ->default(optional(optional(auth()->user())->currentTeam())->id),
                     ]),
 
                 Forms\Components\DatePicker::make('date')
@@ -76,13 +77,16 @@ class InvoiceResource extends Resource
                     ->disabled(fn (Forms\Get $get): bool => $get('status') === 'canceled' || $get('status') === 'paid')
                     ->schema([
                         Forms\Components\Hidden::make('team_id')
-                            ->default(auth()->user()->currentTeam()->id),
+                            ->default(optional(optional(auth()->user())->currentTeam())->id),
                         Forms\Components\Select::make('product_id')
                             ->label('Producto')
                             ->required()
                             ->searchable()
                             ->reactive()
-                            ->options(Product::where('team_id', auth()->user()->currentTeam()->id)->pluck('name', 'id'))
+                            ->options(function () {
+                                $teamId = optional(optional(auth()->user())->currentTeam())->id;
+                                return $teamId ? Product::where('team_id', $teamId)->pluck('name', 'id') : [];
+                            })
                             ->afterStateUpdated(function ($state, Forms\Set $set) {
                                 $product = Product::find($state);
                                 if ($product) {
@@ -181,6 +185,7 @@ class InvoiceResource extends Resource
             ])
             ->actions([
                 TableAction::make('generate_pdf')  // Usa TableAction aquí
+                    ->visible(fn (Invoice $record) => isset($record->status) && $record->status === 'paid')
                     ->label('Generar Factura')
                     ->color('info')
                     ->icon('heroicon-o-document-arrow-down')
@@ -189,8 +194,9 @@ class InvoiceResource extends Resource
                         $invoiceData = $record->toArray();
                         $productsData = $record->products->toArray();
                         $clientData = $record->client->toArray();
-                        $teamLogoPath = auth()->user()->currentTeam()->logo;
-                        $logoExists = Storage::disk('public')->exists($teamLogoPath); // Check if the file exists
+                        $team = optional(optional(auth()->user())->currentTeam());
+                        $teamLogoPath = $team->logo ?? null;
+                        $logoExists = $teamLogoPath ? Storage::disk('public')->exists($teamLogoPath) : false;
 
                         $base64Logo = '';
                         if ($logoExists) {
@@ -199,10 +205,9 @@ class InvoiceResource extends Resource
                         }
 
                         // Get the team details
-                        $teamName = auth()->user()->currentTeam()->name;
-                        $teamRif = auth()->user()->currentTeam()->rif; // Assuming 'rif' is an attribute on your Team model
-                        $teamAddress = auth()->user()->currentTeam()->address; // Assuming 'address' is an attribute on your Team model
-
+                        $teamName = $team->name ?? '';
+                        $teamRif = $team->rif ?? '';
+                        $teamAddress = $team->address ?? '';
 
                         // Pasar los datos a la vista (asegúrate de crear esta vista)
                         $pdf = Pdf::loadView('pdf.invoice', [
@@ -216,26 +221,34 @@ class InvoiceResource extends Resource
                         ]);
 
                         // Descargar el PDF
-                        return response()->streamDownload(function () use ($pdf) {
+                        return response()->streamDownload(function () use ($pdf, $record) {
                             echo $pdf->stream();
-                        }, "factura-{$record->id}.pdf");
+                        }, "factura-" . ($record->id ?? 'sin_id') . ".pdf");
                     }),
-                    Tables\Actions\EditAction::make(),
-                    Tables\Actions\DeleteAction::make(),
+                    Tables\Actions\EditAction::make()
+                        ->visible(fn (Invoice $record) => isset($record->status) && $record->status === 'unpaid'),
+                    // Tables\Actions\DeleteAction::make()
+                    //     ->visible(fn (Invoice $record) => isset($record->status) && $record->status === 'canceled')
+                    //     ->before(function (TableAction $action, Invoice $record) {
+                    //         if (!isset($record->status) || $record->status !== 'canceled') {
+                    //             throw new \Exception('Solo se pueden borrar facturas canceladas.');
+                    //         }
+                    //     }),
             ])
             ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make()
-                        ->before(function (Tables\Actions\DeleteBulkAction $action, Collection $records) {
-                            DB::transaction(function () use ($records) {
-                                foreach ($records as $record) {
-                                    if ($record->status !== 'canceled') {
-                                        $record->restoreStock();
-                                    }
-                                }
-                            });
-                        }),
-                ]),
+                // Tables\Actions\BulkActionGroup::make([
+                //     Tables\Actions\DeleteBulkAction::make()
+                //         ->before(function (Tables\Actions\DeleteBulkAction $action, Collection $records) {
+                //             DB::transaction(function () use ($records) {
+                //                 foreach ($records as $record) {
+                //                     if (!isset($record->status) || $record->status !== 'canceled') {
+                //                         throw new \Exception('Solo se pueden borrar facturas canceladas.');
+                //                     }
+                //                     $record->restoreStock();
+                //                 }
+                //             });
+                //         }),
+                // ]),
             ]);
     }
 
